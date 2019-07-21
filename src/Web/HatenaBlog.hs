@@ -1,4 +1,5 @@
 {-# LANGUAGE DataKinds       #-}
+{-# LANGUAGE DeriveGeneric   #-}
 {-# LANGUAGE QuasiQuotes     #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -10,7 +11,10 @@ module Web.HatenaBlog
     , put
     ) where
 
+import           Data.Aeson               (FromJSON)
+import           Data.Aeson.TH            (defaultOptions, deriveFromJSON)
 import           Data.Foldable            (asum)
+import           GHC.Generics
 import           Network.HTTP.Req
 import           RIO
 import           RIO.Text.Lazy            (toStrict)
@@ -28,8 +32,9 @@ data App = App
 data HatenaConfig = HatenaConfig
     { hatenaId     :: !Text
     , hatenaBlogId :: !Text
-    , hatenaAuth   :: !ByteString
-    }
+    , hatenaAuth   :: !Text
+    } deriving (Eq, Show)
+$(deriveFromJSON defaultOptions ''HatenaConfig)
 
 instance HasLogFunc App where
     logFuncL = RIO.lens appLogFunc (\x y -> x { appLogFunc = y })
@@ -88,8 +93,8 @@ mkEntriesUrl :: HatenaConfig -> Url 'Https
 mkEntriesUrl HatenaConfig{..} =
     https "blog.hatena.ne.jp" /: hatenaId /: hatenaBlogId /: "atom" /: "entry"
 
-mkHeader :: ByteString -> Option 'Https
-mkHeader auth = header "Authorization" ("Basic " <> auth)
+mkHeader :: Text -> Option 'Https
+mkHeader auth = header "Authorization" ("Basic " <> encodeUtf8 auth)
 
 getEntryUrl :: Document -> Maybe Text
 getEntryUrl doc = asum hrefs

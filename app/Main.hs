@@ -3,10 +3,12 @@
 module Main where
 
 import qualified Data.ByteString.Char8 as B (pack)
+import           Data.Yaml             (decodeFileThrow)
 import           Options.Declarative
 import           RIO
 import           RIO.Text
-import           System.Environment    (getArgs, getEnv)
+import           System.Directory      (getHomeDirectory)
+import           System.FilePath       ((</>))
 import           Web.HatenaBlog        (App (..), HatenaConfig (..))
 import qualified Web.HatenaBlog        as Blog
 
@@ -55,14 +57,5 @@ runAction action = do
 
 getHatenaConfig :: IO HatenaConfig
 getHatenaConfig = do
-    hatenaId     <- text "HATENA_ID"
-    hatenaBlogId <- text "HATENA_BLOG_ID"
-    basicAuth    <- bytes "HATENA_BLOG_BASIC_AUTH"
-    return $ HatenaConfig {
-          hatenaId = hatenaId
-        , hatenaBlogId = hatenaBlogId
-        , hatenaAuth = basicAuth
-        }
-  where
-    text  key =   pack <$> getEnv key
-    bytes key = B.pack <$> getEnv key
+    home <- getHomeDirectory
+    decodeFileThrow $ home </> ".hatena.yaml"

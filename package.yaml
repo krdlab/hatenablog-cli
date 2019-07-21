@@ -24,16 +24,19 @@ extra-source-files:
 description:         Please see the README on GitHub at <https://github.com/krdlab/hatenablog-cli#readme>
 
 dependencies:
+- aeson
 - base >= 4.7 && < 5
+- blaze-markup
 - bytestring
+- directory
+- filepath
+- heterocephalus
+- req
+- rio
 - text
 - xml-conduit
 - xml-lens
-- req
-- heterocephalus
-- blaze-markup
-- filepath
-- rio
+- yaml
 
 library:
   source-dirs: src
