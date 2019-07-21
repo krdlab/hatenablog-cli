@@ -1,0 +1,62 @@
+name:                hatenablog
+version:             0.1.0.0
+github:              "krdlab/hatenablog-cli"
+license:             BSD3
+author:              "Sho Kuroda"
+maintainer:          "krdlab@gmail.com"
+copyright:           "Sho Kuroda"
+
+default-extensions:
+  - OverloadedStrings
+  - NoImplicitPrelude
+
+extra-source-files:
+- README.md
+- ChangeLog.md
+
+# Metadata used when publishing your package
+# synopsis:            Short description of your package
+# category:            Web
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description:         Please see the README on GitHub at <https://github.com/krdlab/hatenablog-cli#readme>
+
+dependencies:
+- base >= 4.7 && < 5
+- bytestring
+- text
+- xml-conduit
+- xml-lens
+- req
+- heterocephalus
+- blaze-markup
+- filepath
+- rio
+
+library:
+  source-dirs: src
+
+executables:
+  hatenablog-cli:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - hatenablog
+    - optparse-declarative
+
+tests:
+  hatenablog-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - hatenablog
