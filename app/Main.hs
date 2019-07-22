@@ -41,7 +41,11 @@ getEntry :: Flag "" '["url"] "URL" "a blog entry URL" ByteString
          -> Cmd "Get a blog entry" ()
 getEntry = undefined
 
-listEntries :: Cmd "List blog entries" ()
+instance ArgRead Blog.Page where
+    needArg _ = False
+
+listEntries :: Flag "" '["page"] "PAGE" "" Blog.Page
+            -> Cmd "List blog entries" ()
 listEntries = undefined
 
 runAction :: RIO App () -> IO ()

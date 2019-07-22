@@ -9,6 +9,7 @@ module Web.HatenaBlog
     , HatenaConfig(..)
     , post
     , put
+    , Page(..)
     ) where
 
 import           Data.Aeson               (FromJSON)
@@ -51,9 +52,9 @@ post :: FilePath -> RIO App ()
 post path = do
     App {..} <- ask
     let url = mkEntriesUrl appHatenaConfig
-    let headers = mkHeader (hatenaAuth appHatenaConfig)
+    let header = authHeader appHatenaConfig
     body <- mkEntry path
-    res  <- httpPost url headers body
+    res  <- httpPost url header body
     case parseResponseAsXml res of
         Right doc -> logInfo $ displayShow (getEntryUrl doc)
         Left  err -> logWarn $ displayShow err
@@ -67,17 +68,48 @@ put url path =
 updateEntry :: Url 'Https -> FilePath -> RIO App ()
 updateEntry url path = do
     App {..} <- ask
-    let headers = mkHeader (hatenaAuth appHatenaConfig)
+    let header = authHeader appHatenaConfig
     body <- mkEntry path
-    res  <- httpPut url headers body
+    res  <- httpPut url header body
     case parseResponseAsXml res of
         Right doc -> logInfo $ displayShow (getEntryUrl doc)
         Left  err -> logWarn $ displayShow err
 
+data Feed = Feed
+    { feedFirst :: ByteString
+    , feedNext :: ByteString
+    , feedEntries :: [Entry]
+    }
+
+data Entry = Entry
+    { entryEdit :: ByteString
+    , entryTitle :: Text
+    }
+
+newtype Page = Page
+    { unPage :: String
+    } deriving (Eq, Show, Read)
+
+list :: Maybe Page -> RIO App ()
+list page = do
+    App {..} <- ask
+    let url = mkEntriesUrl appHatenaConfig
+    let header = authHeader appHatenaConfig
+    let options = header <> paramPage page
+    res <- httpGet url options
+    case parseResponseAsXml res of
+        Right doc -> logInfo $ displayShow (getEntryUrl doc)
+        Left  err -> logWarn $ displayShow err
+  where
+    paramPage (Just (Page p)) = "page" =: p
+    paramPage Nothing         = mempty
+
 httpPost :: MonadIO m => Url 'Https -> Option 'Https -> ByteString -> m LbsResponse
-httpPost url headers body = runReq defaultHttpConfig (req POST url (ReqBodyBs body) lbsResponse headers)
+httpPost url options body = runReq defaultHttpConfig (req POST url (ReqBodyBs body) lbsResponse options)
 httpPut  :: MonadIO m => Url 'Https -> Option 'Https -> ByteString -> m LbsResponse
-httpPut  url headers body = runReq defaultHttpConfig (req PUT url (ReqBodyBs body) lbsResponse headers)
+httpPut  url options body = runReq defaultHttpConfig (req PUT url (ReqBodyBs body) lbsResponse options)
+httpGet  :: MonadIO m => Url 'Https -> Option 'Https -> m LbsResponse
+httpGet  url options = runReq defaultHttpConfig (req GET url NoReqBody lbsResponse options)
 
 parseResponseAsXml :: LbsResponse -> Either SomeException Document
 parseResponseAsXml = XML.parseLBS XML.def . responseBody
@@ -93,8 +125,8 @@ mkEntriesUrl :: HatenaConfig -> Url 'Https
 mkEntriesUrl HatenaConfig{..} =
     https "blog.hatena.ne.jp" /: hatenaId /: hatenaBlogId /: "atom" /: "entry"
 
-mkHeader :: Text -> Option 'Https
-mkHeader auth = header "Authorization" ("Basic " <> encodeUtf8 auth)
+authHeader :: HatenaConfig -> Option 'Https
+authHeader HatenaConfig{..} = header "Authorization" ("Basic " <> encodeUtf8 hatenaAuth) -- FIXME: basicAuth
 
 getEntryUrl :: Document -> Maybe Text
 getEntryUrl doc = asum hrefs
