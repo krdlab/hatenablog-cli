@@ -44,9 +44,11 @@ getEntry = undefined
 instance ArgRead Blog.Page where
     needArg _ = False
 
-listEntries :: Flag "" '["page"] "PAGE" "" Blog.Page
+listEntries :: Flag "p" '["page"] "PAGE" "" (Maybe Blog.Page)
             -> Cmd "List blog entries" ()
-listEntries = undefined
+listEntries page = liftIO $ runAction action
+  where
+    action = Blog.list (get page)
 
 runAction :: RIO App () -> IO ()
 runAction action = do

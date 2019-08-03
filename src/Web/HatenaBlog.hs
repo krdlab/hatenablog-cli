@@ -10,11 +10,13 @@ module Web.HatenaBlog
     , post
     , put
     , Page(..)
+    , list
     ) where
 
 import           Data.Aeson               (FromJSON)
 import           Data.Aeson.TH            (defaultOptions, deriveFromJSON)
 import           Data.Foldable            (asum)
+import           Data.Maybe               (fromJust)
 import           GHC.Generics
 import           Network.HTTP.Req
 import           RIO
@@ -24,6 +26,7 @@ import           Text.Blaze.Renderer.Text (renderMarkup)
 import           Text.Heterocephalus
 import qualified Text.XML                 as XML
 import           Text.XML.Lens
+import           Web.HatenaBlog.Types
 
 data App = App
     { appLogFunc      :: !LogFunc
@@ -50,9 +53,9 @@ instance HasConfig HatenaConfig where
 
 post :: FilePath -> RIO App ()
 post path = do
-    App {..} <- ask
-    let url = mkEntriesUrl appHatenaConfig
-    let header = authHeader appHatenaConfig
+    config <- appHatenaConfig <$> ask
+    let url = mkEntriesUrl config
+    let header = authHeader config
     body <- mkEntry path
     res  <- httpPost url header body
     case parseResponseAsXml res of
@@ -67,24 +70,13 @@ put url path =
 
 updateEntry :: Url 'Https -> FilePath -> RIO App ()
 updateEntry url path = do
-    App {..} <- ask
-    let header = authHeader appHatenaConfig
+    config <- appHatenaConfig <$> ask
+    let header = authHeader config
     body <- mkEntry path
     res  <- httpPut url header body
     case parseResponseAsXml res of
         Right doc -> logInfo $ displayShow (getEntryUrl doc)
         Left  err -> logWarn $ displayShow err
-
-data Feed = Feed
-    { feedFirst :: ByteString
-    , feedNext :: ByteString
-    , feedEntries :: [Entry]
-    }
-
-data Entry = Entry
-    { entryEdit :: ByteString
-    , entryTitle :: Text
-    }
 
 newtype Page = Page
     { unPage :: String
@@ -92,13 +84,13 @@ newtype Page = Page
 
 list :: Maybe Page -> RIO App ()
 list page = do
-    App {..} <- ask
-    let url = mkEntriesUrl appHatenaConfig
-    let header = authHeader appHatenaConfig
+    config <- appHatenaConfig <$> ask
+    let url = mkEntriesUrl config
+    let header = authHeader config
     let options = header <> paramPage page
     res <- httpGet url options
     case parseResponseAsXml res of
-        Right doc -> logInfo $ displayShow (getEntryUrl doc)
+        Right doc -> logInfo $ displayShow (toFeed doc)
         Left  err -> logWarn $ displayShow err
   where
     paramPage (Just (Page p)) = "page" =: p
@@ -129,8 +121,4 @@ authHeader :: HatenaConfig -> Option 'Https
 authHeader HatenaConfig{..} = header "Authorization" ("Basic " <> encodeUtf8 hatenaAuth) -- FIXME: basicAuth
 
 getEntryUrl :: Document -> Maybe Text
-getEntryUrl doc = asum hrefs
-  where
-    hrefs = doc ^.. root
-        .  el "{http://www.w3.org/2005/Atom}entry"
-        ./ el "{http://www.w3.org/2005/Atom}link" . attributeIs "rel" "edit" . attribute "href"
+getEntryUrl doc = entryEdit <$> getEntry doc
