@@ -42,31 +42,36 @@ $(deriveFromJSON defaultOptions ''HatenaConfig)
 class HasConfig env where
     configL :: RIO.Lens' env HatenaConfig
 instance HasConfig App where
-    configL = RIO.lens appHatenaConfig (\x y -> x { appHatenaConfig = y })
+    configL = RIO.lens appHatenaConfig (\app c -> app { appHatenaConfig = c })
 instance HasConfig HatenaConfig where
     configL = id
 
-post :: FilePath -> RIO App ()
+class (HasLogFunc env, HasConfig env) => HasEnv env where
+    envL :: RIO.Lens' env App
+instance HasEnv App where
+    envL = id
+
+post :: HasEnv env => FilePath -> RIO env ()
 post path = do
-    App {..} <- ask
-    let url = mkEntriesUrl appHatenaConfig
-    let headers = mkHeader (hatenaAuth appHatenaConfig)
+    config <- RIO.view configL
+    let url = mkEntriesUrl config
+    let headers = mkHeader (hatenaAuth config)
     body <- mkEntry path
     res  <- httpPost url headers body
     case parseResponseAsXml res of
         Right doc -> logInfo $ displayShow (getEntryUrl doc)
         Left  err -> logWarn $ displayShow err
 
-put :: ByteString -> FilePath -> RIO App ()
+put :: HasEnv env => ByteString -> FilePath -> RIO env ()
 put url path =
     case parseUrlHttps url of
         Just (url', _) -> updateEntry url' path
         Nothing        -> logWarn $ displayBytesUtf8 ("invalid url: " <> url)
 
-updateEntry :: Url 'Https -> FilePath -> RIO App ()
+updateEntry :: HasEnv env => Url 'Https -> FilePath -> RIO env ()
 updateEntry url path = do
-    App {..} <- ask
-    let headers = mkHeader (hatenaAuth appHatenaConfig)
+    config <- RIO.view configL
+    let headers = mkHeader (hatenaAuth config)
     body <- mkEntry path
     res  <- httpPut url headers body
     case parseResponseAsXml res of
