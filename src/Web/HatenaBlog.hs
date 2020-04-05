@@ -29,6 +29,9 @@ data App = App
     , appHatenaConfig :: !HatenaConfig
     }
 
+instance HasLogFunc App where
+    logFuncL = RIO.lens appLogFunc (\x y -> x { appLogFunc = y })
+
 data HatenaConfig = HatenaConfig
     { hatenaId     :: !Text
     , hatenaBlogId :: !Text
@@ -36,12 +39,8 @@ data HatenaConfig = HatenaConfig
     } deriving (Eq, Show)
 $(deriveFromJSON defaultOptions ''HatenaConfig)
 
-instance HasLogFunc App where
-    logFuncL = RIO.lens appLogFunc (\x y -> x { appLogFunc = y })
-
 class HasConfig env where
     configL :: RIO.Lens' env HatenaConfig
-
 instance HasConfig App where
     configL = RIO.lens appHatenaConfig (\x y -> x { appHatenaConfig = y })
 instance HasConfig HatenaConfig where

@@ -1,4 +1,4 @@
-name:                hatenablog
+name:                hatenablog-cli
 version:             0.1.0.0
 github:              "krdlab/hatenablog-cli"
 license:             BSD3
@@ -42,7 +42,7 @@ library:
   source-dirs: src
 
 executables:
-  hatenablog-cli:
+  hatenablog:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -50,11 +50,11 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - hatenablog
-    - optparse-declarative
+    - hatenablog-cli
+    - optparse-applicative
 
 tests:
-  hatenablog-test:
+  hatenablog-cli-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -62,4 +62,4 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - hatenablog
+    - hatenablog-cli

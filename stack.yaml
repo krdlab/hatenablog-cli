@@ -40,7 +40,6 @@ packages:
 extra-deps:
   - req-2.0.1
   - retry-0.8.0.1@sha256:149393f74ce7504e171d71046936e58841ccfa0e59a37809824b6d68c04a36e5
-  - optparse-declarative-0.3.0@sha256:12d6a258b528e66fadf9d040447523b2a4ed376bed5e557a94e8148e9fba8c2b
 
 # Override default flag values for local packages and extra-deps
 # flags: {}
