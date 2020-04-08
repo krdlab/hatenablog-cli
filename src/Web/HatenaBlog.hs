@@ -23,6 +23,7 @@ import           Text.Blaze.Renderer.Text (renderMarkup)
 import           Text.Heterocephalus
 import qualified Text.XML                 as XML
 import           Text.XML.Lens
+import           Web.HatenaBlog.Response
 
 data App = App
     { appLogFunc      :: !LogFunc
@@ -53,14 +54,13 @@ instance HasEnv App where
 
 post :: HasEnv env => FilePath -> RIO env ()
 post path = do
-    config <- RIO.view configL
-    let url = mkEntriesUrl config
-    let headers = mkHeader (hatenaAuth config)
-    body <- mkEntry path
+    url <- createPostEntryURL
+    headers <- createHeaders
+    body <- createEntry path
     res  <- httpPost url headers body
-    case parseResponseAsXml res of
-        Right doc -> logInfo $ displayShow (getEntryUrl doc)
-        Left  err -> logWarn $ displayShow err
+    case decode res of
+        Right entry -> logInfo $ displayShow (entryEditURL entry)
+        Left  err   -> logWarn $ displayShow err
 
 put :: HasEnv env => ByteString -> FilePath -> RIO env ()
 put url path =
@@ -70,39 +70,32 @@ put url path =
 
 updateEntry :: HasEnv env => Url 'Https -> FilePath -> RIO env ()
 updateEntry url path = do
-    config <- RIO.view configL
-    let headers = mkHeader (hatenaAuth config)
-    body <- mkEntry path
+    headers <- createHeaders
+    body <- createEntry path
     res  <- httpPut url headers body
-    case parseResponseAsXml res of
-        Right doc -> logInfo $ displayShow (getEntryUrl doc)
-        Left  err -> logWarn $ displayShow err
+    case decode res of
+        Right entry -> logInfo $ displayShow (entryEditURL entry)
+        Left  err   -> logWarn $ displayShow err
+
+createHeaders :: HasEnv env => RIO env (Option 'Https)
+createHeaders = do
+    HatenaConfig{..} <- RIO.view configL
+    let auth = encodeUtf8 hatenaAuth
+    return $ header "Authorization" ("Basic " <> auth)
 
 httpPost :: MonadIO m => Url 'Https -> Option 'Https -> ByteString -> m LbsResponse
 httpPost url headers body = runReq defaultHttpConfig (req POST url (ReqBodyBs body) lbsResponse headers)
 httpPut  :: MonadIO m => Url 'Https -> Option 'Https -> ByteString -> m LbsResponse
 httpPut  url headers body = runReq defaultHttpConfig (req PUT url (ReqBodyBs body) lbsResponse headers)
 
-parseResponseAsXml :: LbsResponse -> Either SomeException Document
-parseResponseAsXml = XML.parseLBS XML.def . responseBody
-
-mkEntry :: FilePath -> RIO env ByteString
-mkEntry contentPath = do
+createEntry :: HasEnv env => FilePath -> RIO env ByteString
+createEntry contentPath = do
     let title = takeBaseName contentPath
     content <- readFileUtf8 contentPath
     let entry = renderMarkup $(compileTextFile "./entry-template.xml")
     return . encodeUtf8 . toStrict $ entry
 
-mkEntriesUrl :: HatenaConfig -> Url 'Https
-mkEntriesUrl HatenaConfig{..} =
-    https "blog.hatena.ne.jp" /: hatenaId /: hatenaBlogId /: "atom" /: "entry"
-
-mkHeader :: Text -> Option 'Https
-mkHeader auth = header "Authorization" ("Basic " <> encodeUtf8 auth)
-
-getEntryUrl :: Document -> Maybe Text
-getEntryUrl doc = asum hrefs
-  where
-    hrefs = doc ^.. root
-        .  el "{http://www.w3.org/2005/Atom}entry"
-        ./ el "{http://www.w3.org/2005/Atom}link" . attributeIs "rel" "edit" . attribute "href"
+createPostEntryURL :: HasEnv env => RIO env (Url 'Https)
+createPostEntryURL = do
+    HatenaConfig{..} <- RIO.view configL
+    return $ https "blog.hatena.ne.jp" /: hatenaId /: hatenaBlogId /: "atom" /: "entry"

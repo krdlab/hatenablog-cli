@@ -40,6 +40,9 @@ dependencies:
 
 library:
   source-dirs: src
+  exposed-modules:
+    - Web.HatenaBlog
+    - Web.HatenaBlog.Response
 
 executables:
   hatenablog:
