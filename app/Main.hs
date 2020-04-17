@@ -66,8 +66,12 @@ main = do
         runRIO app action
 
 selectAction :: Command -> RIO App ()
-selectAction c = case c of
-    Post path    -> Blog.post path
-    Put url path -> Blog.put (BS.pack url) path
-    _            -> undefined
+selectAction c = do
+    res <- case c of
+        Post path    -> Blog.post path
+        Put url path -> Blog.put (BS.pack url) path
+        _            -> undefined -- ! FIXME
+    case res of
+        Right r -> logInfo (displayShow r)
+        Left  l -> logWarn (display l)
 

@@ -2,12 +2,15 @@
 module Web.HatenaBlog.Response
     ( decode
     , BlogEntryResponse(..)
+    , fromDocument, findTitle, findEntryUrl
+    , test
     ) where
 
-import           Data.Maybe       (Maybe, listToMaybe)
+import           Data.ByteString.Lazy (fromStrict)
+import           Data.Maybe           (Maybe, listToMaybe)
 import           Network.HTTP.Req
 import           RIO
-import qualified Text.XML         as XML
+import qualified Text.XML             as XML
 import           Text.XML.Lens
 
 
@@ -20,7 +23,7 @@ data BlogEntryResponse = BlogEntryResponse
 decode :: LbsResponse -> Either String BlogEntryResponse
 decode lbs =
     case parseXml lbs of
-        Left  err -> Left . show $ err
+        Left  err -> Left (show err)
         Right doc -> fromDocument doc
 
 parseXml :: LbsResponse -> Either SomeException Document
@@ -40,14 +43,22 @@ findTitle :: Document -> Maybe Text
 findTitle doc = listToMaybe texts
   where
     texts =
-        doc ^.. root
-            ./ el "{http://www.w3.org/2005/Atom}/entry"
-                ./ el "{http://www.w3.org/2005/Atom}/title" ./ text
+        doc ^.. root . el "{http://www.w3.org/2005/Atom}entry"
+            ./ el "{http://www.w3.org/2005/Atom}title" . text
 
 findEntryUrl :: Document -> Maybe Text
 findEntryUrl doc = listToMaybe hrefs
   where
     hrefs =
-        doc ^.. root
-            ./ el "{http://www.w3.org/2005/Atom}entry"
-                ./ el "{http://www.w3.org/2005/Atom}link" ./ attributeIs "rel" "edit" ./ attr "href"
+        doc ^.. root . el "{http://www.w3.org/2005/Atom}entry"
+            ./ el "{http://www.w3.org/2005/Atom}link" . attributeIs "rel" "edit" . attr "href"
+
+test :: FilePath -> IO BlogEntryResponse
+test path = do
+    bs <- fromStrict <$> readFileBinary path
+    case XML.parseLBS XML.def bs of
+        Left err -> throwIO err
+        Right doc ->
+            case fromDocument doc of
+                Left err  -> error err
+                Right res -> return res

@@ -14,6 +14,8 @@ module Web.HatenaBlog
 import           Data.Aeson               (FromJSON)
 import           Data.Aeson.TH            (defaultOptions, deriveFromJSON)
 import           Data.Foldable            (asum)
+import qualified Data.Text                as T
+import qualified Data.Text.Encoding       as T
 import           GHC.Generics
 import           Network.HTTP.Req
 import           RIO
@@ -52,30 +54,31 @@ class (HasLogFunc env, HasConfig env) => HasEnv env where
 instance HasEnv App where
     envL = id
 
-post :: HasEnv env => FilePath -> RIO env ()
+post :: HasEnv env => FilePath -> RIO env (Either Text Text)
 post path = do
     url <- createPostEntryURL
     headers <- createHeaders
     body <- createEntry path
     res  <- httpPost url headers body
     case decode res of
-        Right entry -> logInfo $ displayShow (entryEditURL entry)
-        Left  err   -> logWarn $ displayShow err
+        Right entry -> return $ Right (entryEditURL entry)
+        Left  err   -> return $ Left (T.pack err)
 
-put :: HasEnv env => ByteString -> FilePath -> RIO env ()
+put :: HasEnv env => ByteString -> FilePath -> RIO env (Either Text Text)
 put url path =
     case parseUrlHttps url of
-        Just (url', _) -> updateEntry url' path
-        Nothing        -> logWarn $ displayBytesUtf8 ("invalid url: " <> url)
-
-updateEntry :: HasEnv env => Url 'Https -> FilePath -> RIO env ()
-updateEntry url path = do
-    headers <- createHeaders
-    body <- createEntry path
-    res  <- httpPut url headers body
-    case decode res of
-        Right entry -> logInfo $ displayShow (entryEditURL entry)
-        Left  err   -> logWarn $ displayShow err
+        Nothing        -> return $ Left ("invalid url: " <> T.decodeUtf8 url)
+        Just (url', _) -> do
+            res <- updateEntry url' path
+            case res of
+                Right entry -> return $ Right (entryEditURL entry)
+                Left  err   -> return $ Left (T.pack err)
+  where
+    updateEntry url path = do
+        headers <- createHeaders
+        body <- createEntry path
+        res  <- httpPut url headers body
+        return $ decode res
 
 createHeaders :: HasEnv env => RIO env (Option 'Https)
 createHeaders = do
@@ -85,6 +88,7 @@ createHeaders = do
 
 httpPost :: MonadIO m => Url 'Https -> Option 'Https -> ByteString -> m LbsResponse
 httpPost url headers body = runReq defaultHttpConfig (req POST url (ReqBodyBs body) lbsResponse headers)
+
 httpPut  :: MonadIO m => Url 'Https -> Option 'Https -> ByteString -> m LbsResponse
 httpPut  url headers body = runReq defaultHttpConfig (req PUT url (ReqBodyBs body) lbsResponse headers)
 
